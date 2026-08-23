@@ -24,6 +24,11 @@ npm run test:e2e
 The production artifact is `dist/index.html`. It contains the optimized Elm
 application, styles, local persistence bridge, and positional Base64URL codec.
 
+## Agent prompt
+
+Open [toss.quitter.live/agent](https://toss.quitter.live/agent) for a copyable
+prompt containing the complete binary codec and reference link encoder.
+
 ## Container
 
 Build the single-file app first, then the nginx image:

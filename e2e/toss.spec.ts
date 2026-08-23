@@ -93,3 +93,38 @@ test('Given a mobile viewport, Then the builder fits without horizontal scrollin
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
   await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
 });
+
+test('Given the agent page, When Copy is pressed, Then the complete link recipe reaches the clipboard', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/?agent');
+
+  await expect(page.getByRole('heading', { name: 'Make Toss links' })).toBeVisible();
+  await expect(page.getByTestId('agent-prompt')).toContainText('Base64URL without padding');
+  await expect(page.getByTestId('agent-prompt')).toContainText('function encodePicker');
+  await page.getByRole('button', { name: 'Copy prompt' }).click();
+  await expect(page.getByRole('status')).toHaveText('Copied.');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('https://toss.quitter.live/#');
+
+  const generatedUrl = await page.evaluate(() => {
+    const prompt = document.querySelector('[data-testid="agent-prompt"]')?.textContent || '';
+    const reference = prompt.split('Reference JavaScript:\n\n')[1];
+    const run = new Function(`${reference}\nreturn makeTossUrl({ title: "Agent dinner", groups: [{ name: "Food", background: "#ffd43b", foreground: "#171717", pickCount: 1, options: [{ label: "Ramen", imageUrl: "" }] }] });`);
+    return run() as string;
+  });
+  await page.goto(generatedUrl);
+  await expect(page.getByRole('heading', { name: 'Agent dinner' })).toBeVisible();
+  await expect(page.getByText('Ramen', { exact: true })).toBeVisible();
+});
+
+test('Given clipboard denial on the agent page, When Copy is pressed, Then the failure is visible', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'clipboard', {
+      configurable: true,
+      get: () => ({ writeText: () => Promise.reject(new Error('denied')) }),
+    });
+  });
+  await page.goto('/?agent');
+
+  await page.getByRole('button', { name: 'Copy prompt' }).click();
+  await expect(page.getByRole('status')).toHaveText('Copy failed. Select the prompt and copy it manually.');
+});

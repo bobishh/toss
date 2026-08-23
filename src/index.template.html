@@ -146,6 +146,20 @@
     .tower-mark { width: 36px; height: 54px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: square; stroke-linejoin: miter; }
     .tower-mark__sphere { fill: var(--red); }
     .footer-copy { font-size: .78rem; }
+
+    .agent-page[hidden] { display: none; }
+    .agent-page { min-height: 100vh; background: var(--paper); }
+    .agent-topbar { min-height: 76px; padding: 0 clamp(18px, 4vw, 56px); border-bottom: 2px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .agent-home { color: var(--ink); font-weight: 950; text-decoration: none; letter-spacing: -.04em; }
+    .agent-route { font: 800 .72rem/1 ui-monospace, monospace; letter-spacing: .12em; }
+    .agent-main { width: min(1040px, 100%); margin: 0 auto; padding: clamp(36px, 7vw, 88px) clamp(16px, 4vw, 56px) 96px; }
+    .agent-intro { max-width: 800px; margin-bottom: 34px; }
+    .agent-intro h1 { font-size: clamp(3.1rem, 9vw, 7rem); }
+    .agent-intro p { max-width: 660px; color: var(--muted); font-size: clamp(1rem, 2vw, 1.25rem); line-height: 1.5; }
+    .agent-prompt-shell { border: 2px solid var(--line); background: var(--panel); box-shadow: 8px 8px 0 var(--ink); }
+    .agent-prompt-actions { position: sticky; top: 0; z-index: 2; padding: 12px; border-bottom: 2px solid var(--line); background: var(--yellow); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .agent-copy-status { min-height: 1em; font: 800 .72rem/1.3 ui-monospace, monospace; }
+    .agent-prompt { min-height: 560px; max-height: 72vh; margin: 0; padding: clamp(18px, 4vw, 34px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 650 .78rem/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
     @keyframes throw {
@@ -185,6 +199,11 @@
       .total-pill { padding: 0 10px; }
       .run-group { min-height: 260px; box-shadow: 5px 5px 0 var(--ink); }
       .site-footer { align-items: center; }
+      .agent-topbar { min-height: 64px; }
+      .agent-prompt-actions { align-items: stretch; flex-direction: column; }
+      .agent-prompt-actions .button { width: 100%; }
+      .agent-copy-status { text-align: center; }
+      .agent-prompt { max-height: none; }
     }
 
     @media (max-width: 390px) {
@@ -200,10 +219,169 @@
   </style>
 </head>
 <body>
+  <section id="agent-page" class="agent-page" hidden>
+    <header class="agent-topbar">
+      <a class="agent-home" href="/">← TOSS</a>
+      <span class="agent-route">/AGENT</span>
+    </header>
+    <main class="agent-main">
+      <section class="agent-intro">
+        <div class="eyebrow">COPY. PASTE. GET A LINK.</div>
+        <h1>Make Toss links</h1>
+        <p>Give this prompt to an agent. It can encode a complete Toss directly into a shareable URL. No API or account needed.</p>
+      </section>
+      <section class="agent-prompt-shell" aria-label="Agent prompt">
+        <div class="agent-prompt-actions">
+          <button id="copy-agent-prompt" class="button button--primary" type="button">Copy prompt</button>
+          <span id="agent-copy-status" class="agent-copy-status" role="status" aria-live="polite"></span>
+        </div>
+        <pre id="agent-prompt" class="agent-prompt" data-testid="agent-prompt" tabindex="0"></pre>
+      </section>
+    </main>
+  </section>
   <div id="app"></div>
   <script>/*__ELM_BUNDLE__*/</script>
+  <script id="agent-prompt-source" type="text/plain">
+You create shareable Toss links. Toss is a static picker at https://toss.quitter.live/. It has no API, upload, account, or server-side state. Encode the complete picker into the URL fragment.
+
+Return:
+https://toss.quitter.live/#PAYLOAD
+
+For a reproducible result, append a positive base-36 seed:
+https://toss.quitter.live/#PAYLOAD~SEED
+
+Input model:
+{
+  title: string,
+  groups: [{
+    name: string,
+    background: "#rrggbb",
+    foreground: "#rrggbb",
+    pickCount: integer,
+    options: [{ label: string, imageUrl: string }]
+  }]
+}
+
+Rules:
+- Require at least one group and one option per group.
+- Require 1 <= pickCount <= options.length.
+- Empty imageUrl is valid.
+- If the user omits a title, use "Toss".
+- If the user omits pickCount, use 1.
+- If colors are omitted, cycle backgrounds #ffd43b, #ff6b35, #69db7c, #74c0fc and use #171717 foreground.
+- Preserve Unicode by encoding strings as UTF-8.
+- The payload uses Base64URL without padding, not JSON Base64.
+- Do not invent a result seed unless the user asks for a fixed result.
+- Return the URL plus a compact summary. Do not dump codec internals unless asked.
+
+Binary codec v1, in order:
+1. Byte 1: codec version.
+2. String: picker title.
+3. Byte 0: Toss mechanic.
+4. Varuint: group count.
+5. For each group:
+   a. String: group name.
+   b. 3 bytes: background RGB.
+   c. 3 bytes: foreground RGB.
+   d. Varuint: pickCount.
+   e. Varuint: option count.
+   f. For each option: label string, then imageUrl string.
+
+A string is its UTF-8 byte length as a varuint, followed by those bytes.
+A varuint writes seven low bits per byte, least-significant group first. Set bit 7 when another byte follows.
+
+Reference JavaScript:
+
+function encodePicker(picker) {
+  const encoder = new TextEncoder();
+  const bytes = [];
+  const byte = value => bytes.push(value & 255);
+  const varuint = value => {
+    let current = Math.max(0, Math.floor(value));
+    do {
+      let next = current & 127;
+      current = Math.floor(current / 128);
+      if (current > 0) next |= 128;
+      byte(next);
+    } while (current > 0);
+  };
+  const string = value => {
+    const encoded = encoder.encode(String(value));
+    varuint(encoded.length);
+    for (const value of encoded) byte(value);
+  };
+  const color = value => {
+    const match = /^#([0-9a-f]{6})$/i.exec(value);
+    if (!match) throw new Error(`Invalid color: ${value}`);
+    byte(parseInt(match[1].slice(0, 2), 16));
+    byte(parseInt(match[1].slice(2, 4), 16));
+    byte(parseInt(match[1].slice(4, 6), 16));
+  };
+
+  if (!picker.groups?.length) throw new Error("At least one group is required");
+  byte(1);
+  string(picker.title || "Toss");
+  byte(0);
+  varuint(picker.groups.length);
+
+  for (const group of picker.groups) {
+    if (!group.options?.length) throw new Error("Every group needs an option");
+    if (!Number.isInteger(group.pickCount) || group.pickCount < 1 || group.pickCount > group.options.length) {
+      throw new Error("pickCount must fit the option count");
+    }
+    string(group.name);
+    color(group.background);
+    color(group.foreground);
+    varuint(group.pickCount);
+    varuint(group.options.length);
+    for (const option of group.options) {
+      string(option.label);
+      string(option.imageUrl || "");
+    }
+  }
+
+  let base64;
+  if (typeof Buffer !== "undefined") {
+    base64 = Buffer.from(bytes).toString("base64");
+  } else {
+    let binary = "";
+    for (const value of bytes) binary += String.fromCharCode(value);
+    base64 = btoa(binary);
+  }
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function makeTossUrl(picker, seed = null) {
+  const payload = encodePicker(picker);
+  if (seed == null) return `https://toss.quitter.live/#${payload}`;
+  if (!Number.isSafeInteger(seed) || seed < 1 || seed > 0x7fffffff) throw new Error("Invalid seed");
+  return `https://toss.quitter.live/#${payload}~${seed.toString(36)}`;
+}
+  </script>
   <script>
     (() => {
+      const agentRoute = location.pathname.replace(/\/+$/, '') === '/agent' || new URLSearchParams(location.search).has('agent');
+      if (agentRoute) {
+        const appNode = document.getElementById('app');
+        const agentPage = document.getElementById('agent-page');
+        const prompt = document.getElementById('agent-prompt-source').textContent.trim();
+        const promptNode = document.getElementById('agent-prompt');
+        const statusNode = document.getElementById('agent-copy-status');
+        document.title = 'Toss — agent prompt';
+        appNode.hidden = true;
+        agentPage.hidden = false;
+        promptNode.textContent = prompt;
+        document.getElementById('copy-agent-prompt').addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(prompt);
+            statusNode.textContent = 'Copied.';
+          } catch (_) {
+            statusNode.textContent = 'Copy failed. Select the prompt and copy it manually.';
+          }
+        });
+        return;
+      }
+
       const STORAGE_KEY = 'toss:pickers:v1';
       const encoder = new TextEncoder();
       const decoder = new TextDecoder('utf-8', { fatal: true });

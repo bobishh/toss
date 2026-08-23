@@ -1,8 +1,8 @@
 port module Main exposing (main)
 
 import Browser
-import Html exposing (Html, button, div, fieldset, footer, h1, h2, h3, header, img, input, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, selected, src, style, type_, value)
+import Html exposing (Html, a, button, div, fieldset, footer, h1, h2, h3, header, img, input, label, main_, option, p, section, select, span, strong, text)
+import Html.Attributes exposing (attribute, class, disabled, for, href, id, placeholder, selected, src, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
@@ -483,7 +483,9 @@ viewBuilder model =
         [ section [ class "builder-intro" ]
             [ h1 [] [ text "What" ]
             , p [ class "lede" ]
-                [ text "Add one or more lists. Choose how many items to pick from each." ]
+                [ text "Add one or more lists. Choose how many items to pick from each. "
+                , a [ class "agent-lede-link", href "/agent" ] [ text "Or tell your agent what you need to toss" ]
+                ]
             ]
         , viewLocalShelf model
         , case model.sharedError of

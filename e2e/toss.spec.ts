@@ -116,6 +116,16 @@ test('Given the agent page, When Copy is pressed, Then the complete link recipe 
   await expect(page.getByText('Ramen', { exact: true })).toBeVisible();
 });
 
+test('Given the home page, When the agent lead is followed, Then the prompt opens', async ({ page }) => {
+  await page.goto('/');
+
+  const agentLink = page.getByRole('link', { name: 'Or tell your agent what you need to toss' });
+  await expect(agentLink).toHaveAttribute('href', '/agent');
+  await agentLink.click();
+  await expect(page).toHaveURL(/\/agent$/);
+  await expect(page.getByRole('heading', { name: 'Make Toss links' })).toBeVisible();
+});
+
 test('Given clipboard denial on the agent page, When Copy is pressed, Then the failure is visible', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'clipboard', {

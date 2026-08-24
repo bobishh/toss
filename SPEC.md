@@ -28,11 +28,11 @@ The user:
 4. adds options to each group;
 5. sets `pickCount` as “pick N of M” for each group;
 6. chooses group background and text colors;
-7. optionally adds an image URL to an option;
-8. saves the selector locally or opens its Run screen.
+7. saves the selector locally or opens its Run screen.
 
 The interface displays the total result count as the sum of all group
-`pickCount` values.
+`pickCount` values. Every edit replaces the URL with an editing-state link, so
+reload and sharing preserve an unfinished form.
 
 ### Step 2: Run
 
@@ -67,9 +67,7 @@ type alias Group =
     }
 
 type alias Option =
-    { label : String
-    , imageUrl : String
-    }
+    { label : String }
 ```
 
 `Mechanic` is explicit so future presentation mechanics can reuse selectors
@@ -92,12 +90,18 @@ and never enter the selection pool.
 Use the fragment, not the query string:
 
 ```text
-https://example.test/#<payload>
-https://example.test/#<payload>~<seed>
+https://example.test/#e.<payload>
+https://example.test/#r.<payload>
+https://example.test/#r.<payload>~<seed>
 ```
 
 The fragment never reaches a static host. Base64URL makes the payload compact
-and visually opaque, but does not provide secrecy.
+and visually opaque, but does not provide secrecy. `e.` opens Build. `r.` opens
+Run. Legacy unprefixed payloads remain valid and open Run.
+
+The final canonical URL, including origin, mode prefix, payload, separator, and
+optional seed, must not exceed 2,000 characters. The app encodes on every edit,
+shows the exact final length, and blocks Continue above the limit.
 
 Payload version 1 uses a positional binary format:
 
@@ -114,12 +118,14 @@ groups[]:
   optionCount:varuint
   options[]:
     label:utf8
-    imageUrl:utf8
+    reservedImageUrl:utf8
 ```
 
 UTF-8 strings use a varuint byte length followed by bytes. The seed is a
 positive 31-bit integer encoded separately in Base36. Unknown versions fail
-closed and show a recoverable invalid-link state.
+closed and show a recoverable invalid-link state. New links always write the
+reserved image URL as an empty string. Decoding consumes and ignores it so old
+version 1 links containing image URLs still work.
 
 ## Local persistence
 
@@ -142,7 +148,6 @@ JSON is acceptable locally; shared URLs use the positional codec above.
 - Native color inputs provide the initial color picker.
 - Toss animation treats options as physical cards thrown onto a result surface.
 - `prefers-reduced-motion` disables displacement and spin.
-- Text remains visible when images fail or are absent.
 
 ## Validation and recovery
 
@@ -152,7 +157,8 @@ Run is blocked when:
 - no group exists;
 - a group name is empty;
 - a group contains an empty option;
-- a group has fewer valid options than `pickCount`.
+- a group has fewer valid options than `pickCount`;
+- the final encoded URL exceeds 2,000 characters.
 
 Validation appears beside the affected control and in a concise summary. An
 invalid shared payload opens the builder with an explanation; local selectors
@@ -173,6 +179,13 @@ Given a completed Toss URL,
 when another browser opens it,
 then it renders the same grouped result without local state.
 
+### Editable share
+
+Given an unfinished selector in Build,
+when its `#e.` URL is reloaded or opened in another browser,
+then the same form values remain editable. Continue changes the mode to `#r.`;
+Change restores `#e.` without losing values.
+
 ### Validation failure
 
 Given a group containing an empty option,
@@ -192,5 +205,6 @@ then controls remain reachable without horizontal scrolling.
 - weighted options;
 - collaborative exclusion across devices;
 - embedded image bytes;
+- image URLs;
 - additional mechanics such as wheel, cards, or slot machine;
 - server persistence and accounts.

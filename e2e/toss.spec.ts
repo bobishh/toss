@@ -11,6 +11,8 @@ test('Given three configured lists, When Toss runs, Then grouped results and a r
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Dinner toss');
     await expect(page.getByTestId('total-picks')).toHaveText('5 picks');
     await expect(page.getByLabel('Weed item 1', { exact: true })).toHaveValue('Runtz');
+    await expect(page.getByPlaceholder('Image URL (optional)')).toHaveCount(0);
+    await expect(page.getByTestId('share-length')).toHaveText(/^\d+ \/ 2,000 characters$/);
     await expect(page.getByText('ELM 0.19.2')).toHaveCount(0);
     await expect(page.locator('.site-footer')).toHaveText(/tossed together @ berlin \d{4}/);
     await expect(page.locator('.tower-mark')).toBeVisible();
@@ -21,6 +23,8 @@ test('Given three configured lists, When Toss runs, Then grouped results and a r
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page.getByRole('heading', { name: 'Dinner toss' })).toBeVisible();
     await expect(page.getByTestId('run-group-Beer')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+    const pickerLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
+    expect(pickerLength).toBe(`https://toss.quitter.live/${await page.evaluate(() => location.hash)}`.length);
   });
 
   await test.step('Then Toss reveals one beer, two unique foods, and two unique strains', async () => {
@@ -30,8 +34,10 @@ test('Given three configured lists, When Toss runs, Then grouped results and a r
     await expect(page.getByTestId('result-card').nth(0)).toBeVisible();
     await expect.poll(() => page.evaluate(() => location.hash)).not.toBe(hashBefore);
     const resultHash = await page.evaluate(() => location.hash);
-    expect(resultHash).toMatch(/^#[A-Za-z0-9_-]+~[0-9a-z]+$/);
+    expect(resultHash).toMatch(/^#r\.[A-Za-z0-9_-]+~[0-9a-z]+$/);
     expect(resultHash).not.toContain('IPA');
+    const resultLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
+    expect(resultLength).toBe(`https://toss.quitter.live/${resultHash}`.length);
 
     const foods = await page.getByTestId('result-group-Food').getByTestId('result-card').allTextContents();
     expect(new Set(foods).size).toBe(2);
@@ -61,16 +67,61 @@ test('Given an empty option, When Run is requested, Then the builder explains th
   await expect(firstBeer).toHaveAttribute('aria-invalid', 'true');
 });
 
+test('Given an unfinished toss, Then its editing and run states survive sharing and Change', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Name', { exact: true }).fill('Still choosing');
+  await page.getByRole('textbox', { name: 'Beer item 1', exact: true }).fill('Pilsner');
+  await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#e\.[A-Za-z0-9_-]+$/);
+
+  const editingUrl = page.url();
+  const fresh = await page.context().newPage();
+  await fresh.goto(editingUrl);
+  await expect(fresh.getByRole('heading', { name: 'What', exact: true })).toBeVisible();
+  await expect(fresh.getByLabel('Name', { exact: true })).toHaveValue('Still choosing');
+  await expect(fresh.getByRole('textbox', { name: 'Beer item 1', exact: true })).toHaveValue('Pilsner');
+  await fresh.reload();
+  await expect(fresh.getByLabel('Name', { exact: true })).toHaveValue('Still choosing');
+  await expect(fresh.getByRole('textbox', { name: 'Beer item 1', exact: true })).toHaveValue('Pilsner');
+
+  await fresh.getByRole('button', { name: 'Continue' }).click();
+  await expect.poll(() => fresh.evaluate(() => location.hash)).toMatch(/^#r\.[A-Za-z0-9_-]+$/);
+  await fresh.getByRole('button', { name: '← Change' }).click();
+  await expect.poll(() => fresh.evaluate(() => location.hash)).toMatch(/^#e\.[A-Za-z0-9_-]+$/);
+  await expect(fresh.getByLabel('Name', { exact: true })).toHaveValue('Still choosing');
+});
+
+test('Given an encoded URL above 2,000 characters, Then its exact size is shown and Continue is disabled', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('textbox', { name: 'Beer item 1', exact: true }).fill('x'.repeat(1800));
+
+  const meter = page.getByTestId('share-length');
+  await expect(meter).toHaveText(/^\d{1,3},\d{3} \/ 2,000 characters$/);
+  const measuredLength = Number((await meter.textContent())?.split(' ')[0].replace(',', ''));
+  expect(measuredLength).toBeGreaterThan(2000);
+  await expect(page.getByRole('alert')).toContainText(`Picker too large: ${measuredLength.toLocaleString('en-US')} / 2,000 characters. Shorten labels or remove items.`);
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
+});
+
+test('Given an old v1 link containing an image URL, Then its text survives and the image is ignored', async ({ page }) => {
+  await page.goto('/#AQ5PbGQgaW1hZ2UgdG9zcwABBEZvb2T_1DsXFxcBAQVSYW1lbh1odHRwczovL2V4YW1wbGUuY29tL3JhbWVuLmpwZw');
+
+  await expect(page.getByRole('heading', { name: 'Old image toss' })).toBeVisible();
+  await expect(page.getByText('Ramen', { exact: true })).toBeVisible();
+  await expect(page.locator('img')).toHaveCount(0);
+});
+
 test('Given local presets, When two tosses are saved, Then both survive reload', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Save here' }).click();
   await page.getByRole('button', { name: '+ New toss' }).click();
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('New toss');
   await page.getByLabel('Name', { exact: true }).fill('Weekend toss');
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Weekend toss');
   await page.getByRole('button', { name: 'Save here' }).click();
   await page.reload();
 
   await expect(page.getByLabel('Saved tosses').locator('option')).toHaveCount(3);
-  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Dinner toss');
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Weekend toss');
 });
 
 test('Given a damaged shared payload, Then Toss recovers without touching the builder', async ({ page }) => {
@@ -101,6 +152,7 @@ test('Given the agent page, When Copy is pressed, Then the complete link recipe 
   await expect(page.getByRole('heading', { name: 'Make Toss links' })).toBeVisible();
   await expect(page.getByTestId('agent-prompt')).toContainText('Base64URL without padding');
   await expect(page.getByTestId('agent-prompt')).toContainText('function encodePicker');
+  await expect(page.getByTestId('agent-prompt')).toContainText('image slot is always an empty string');
   await page.getByRole('button', { name: 'Copy prompt' }).click();
   await expect(page.getByRole('status')).toHaveText('Copied.');
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('https://toss.quitter.live/#');
@@ -108,10 +160,10 @@ test('Given the agent page, When Copy is pressed, Then the complete link recipe 
   const generatedUrl = await page.evaluate(() => {
     const prompt = document.querySelector('[data-testid="agent-prompt"]')?.textContent || '';
     const reference = prompt.split('Reference JavaScript:\n\n')[1];
-    const run = new Function(`${reference}\nreturn makeTossUrl({ title: "Agent dinner", groups: [{ name: "Food", background: "#ffd43b", foreground: "#171717", pickCount: 1, options: [{ label: "Ramen", imageUrl: "" }] }] });`);
+    const run = new Function(`${reference}\nreturn makeTossUrl({ title: "Agent dinner", groups: [{ name: "Food", background: "#ffd43b", foreground: "#171717", pickCount: 1, options: [{ label: "Ramen" }] }] });`);
     return run() as string;
   });
-  await page.goto(generatedUrl);
+  await page.goto('/' + new URL(generatedUrl).hash);
   await expect(page.getByRole('heading', { name: 'Agent dinner' })).toBeVisible();
   await expect(page.getByText('Ramen', { exact: true })).toBeVisible();
 });

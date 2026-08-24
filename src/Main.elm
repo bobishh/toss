@@ -1,8 +1,8 @@
 port module Main exposing (main)
 
 import Browser
-import Html exposing (Html, a, button, div, fieldset, footer, h1, h2, h3, header, img, input, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (attribute, class, disabled, for, href, id, placeholder, selected, src, style, type_, value)
+import Html exposing (Html, a, button, div, fieldset, footer, h1, h2, h3, header, input, label, main_, option, p, section, select, span, strong, text)
+import Html.Attributes exposing (attribute, class, disabled, for, href, id, placeholder, selected, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
@@ -20,9 +20,6 @@ port persist : Encode.Value -> Cmd msg
 port setShare : Encode.Value -> Cmd msg
 
 
-port clearShare : () -> Cmd msg
-
-
 port requestSeed : () -> Cmd msg
 
 
@@ -35,13 +32,18 @@ port copyLink : () -> Cmd msg
 port linkCopied : (Bool -> msg) -> Sub msg
 
 
+port measureShare : Encode.Value -> Cmd msg
+
+
+port shareMeasured : (ShareMeasurement -> msg) -> Sub msg
+
+
 type Mechanic
     = Toss
 
 
 type alias Choice =
     { label : String
-    , imageUrl : String
     }
 
 
@@ -89,6 +91,8 @@ type alias Model =
     , notice : Maybe String
     , sharedError : Maybe String
     , year : Int
+    , shareRevision : Int
+    , shareLength : Maybe Int
     }
 
 
@@ -98,6 +102,13 @@ type alias Flags =
     , seed : Maybe Int
     , sharedError : Maybe String
     , year : Int
+    , editing : Bool
+    }
+
+
+type alias ShareMeasurement =
+    { revision : Int
+    , length : Int
     }
 
 
@@ -108,7 +119,6 @@ type Msg
     | SetGroupForeground Int String
     | ChangePickCount Int Int
     | SetChoiceLabel Int Int String
-    | SetChoiceImage Int Int String
     | AddChoice Int
     | RemoveChoice Int Int
     | AddGroup
@@ -123,6 +133,7 @@ type Msg
     | Reveal
     | CopyResult
     | Copied Bool
+    | ShareMeasured ShareMeasurement
 
 
 main : Program Decode.Value Model Msg
@@ -146,6 +157,7 @@ init rawFlags =
                     , seed = Nothing
                     , sharedError = Just "Saved data could not be opened. Starting fresh."
                     , year = 2026
+                    , editing = False
                     }
 
         picker =
@@ -158,22 +170,21 @@ init rawFlags =
                         |> List.head
                         |> Maybe.withDefault defaultPicker
 
-        openedFromLink =
+        initialScreen =
             case flags.shared of
                 Just _ ->
-                    True
+                    if flags.editing then
+                        BuildScreen
+
+                    else
+                        RunScreen
 
                 Nothing ->
-                    False
+                    BuildScreen
     in
     ( { picker = picker
       , saved = flags.saved
-      , screen =
-            if openedFromLink then
-                RunScreen
-
-            else
-                BuildScreen
+      , screen = initialScreen
       , seed = flags.seed
       , tossState =
             case flags.seed of
@@ -186,8 +197,17 @@ init rawFlags =
       , notice = Nothing
       , sharedError = flags.sharedError
       , year = flags.year
+      , shareRevision = 0
+      , shareLength = Nothing
       }
-    , Cmd.none
+    , Cmd.batch
+        [ measureSharePayload 0 picker flags.seed (initialScreen == BuildScreen)
+        , if initialScreen == BuildScreen then
+            setSharePayload picker Nothing True
+
+          else
+            Cmd.none
+        ]
     )
 
 
@@ -196,6 +216,7 @@ subscriptions _ =
     Sub.batch
         [ seedReceived GotSeed
         , linkCopied Copied
+        , shareMeasured ShareMeasured
         ]
 
 
@@ -237,21 +258,9 @@ update msg model =
                 )
                 model
 
-        SetChoiceImage groupIndex choiceIndex imageUrl ->
-            updateGroup groupIndex
-                (\group ->
-                    { group
-                        | options =
-                            updateAt choiceIndex
-                                (\choice -> { choice | imageUrl = imageUrl })
-                                group.options
-                    }
-                )
-                model
-
         AddChoice groupIndex ->
             updateGroup groupIndex
-                (\group -> { group | options = group.options ++ [ { label = "", imageUrl = "" } ] })
+                (\group -> { group | options = group.options ++ [ { label = "" } ] })
                 model
 
         RemoveChoice groupIndex choiceIndex ->
@@ -283,8 +292,8 @@ update msg model =
                                      , foreground = "#ffffff"
                                      , pickCount = 1
                                      , options =
-                                        [ { label = "First item", imageUrl = "" }
-                                        , { label = "Second item", imageUrl = "" }
+                                        [ { label = "First item" }
+                                        , { label = "Second item" }
                                         ]
                                      }
                                    ]
@@ -309,6 +318,10 @@ update msg model =
         LoadSaved rawId ->
             case String.toInt rawId |> Maybe.andThen (findPicker model.saved) of
                 Just picker ->
+                    let
+                        revision =
+                            model.shareRevision + 1
+                    in
                     ( { model
                         | picker = picker
                         , screen = BuildScreen
@@ -316,8 +329,13 @@ update msg model =
                         , tossState = Waiting
                         , errors = []
                         , notice = Nothing
+                        , shareRevision = revision
+                        , shareLength = Nothing
                       }
-                    , clearShare ()
+                    , Cmd.batch
+                        [ setSharePayload picker Nothing True
+                        , measureSharePayload revision picker Nothing True
+                        ]
                     )
 
                 Nothing ->
@@ -331,16 +349,27 @@ update msg model =
                         |> List.maximum
                         |> Maybe.withDefault 0
                         |> (+) 1
+
+                picker =
+                    blankPicker nextId
+
+                revision =
+                    model.shareRevision + 1
             in
             ( { model
-                | picker = blankPicker nextId
+                | picker = picker
                 , screen = BuildScreen
                 , seed = Nothing
                 , tossState = Waiting
                 , errors = []
                 , notice = Nothing
+                , shareRevision = revision
+                , shareLength = Nothing
               }
-            , clearShare ()
+            , Cmd.batch
+                [ setSharePayload picker Nothing True
+                , measureSharePayload revision picker Nothing True
+                ]
             )
 
         OpenRun ->
@@ -348,29 +377,47 @@ update msg model =
                 errors =
                     validate model.picker
             in
-            if List.isEmpty errors then
+            if List.isEmpty errors && shareFits model.shareLength then
+                let
+                    revision =
+                        model.shareRevision + 1
+                in
                 ( { model
                     | screen = RunScreen
                     , seed = Nothing
                     , tossState = Waiting
                     , errors = []
                     , notice = Nothing
+                    , shareRevision = revision
+                    , shareLength = Nothing
                   }
-                , setSharePayload model.picker Nothing
+                , Cmd.batch
+                    [ setSharePayload model.picker Nothing False
+                    , measureSharePayload revision model.picker Nothing False
+                    ]
                 )
 
             else
                 ( { model | errors = errors, notice = Nothing }, Cmd.none )
 
         BackToBuild ->
+            let
+                revision =
+                    model.shareRevision + 1
+            in
             ( { model
                 | screen = BuildScreen
                 , seed = Nothing
                 , tossState = Waiting
                 , errors = []
                 , notice = Nothing
+                , shareRevision = revision
+                , shareLength = Nothing
               }
-            , clearShare ()
+            , Cmd.batch
+                [ setSharePayload model.picker Nothing True
+                , measureSharePayload revision model.picker Nothing True
+                ]
             )
 
         TossNow ->
@@ -379,9 +426,19 @@ update msg model =
             )
 
         GotSeed seed ->
-            ( { model | seed = Just seed, tossState = Tossing }
+            let
+                revision =
+                    model.shareRevision + 1
+            in
+            ( { model
+                | seed = Just seed
+                , tossState = Tossing
+                , shareRevision = revision
+                , shareLength = Nothing
+              }
             , Cmd.batch
-                [ setSharePayload model.picker (Just seed)
+                [ setSharePayload model.picker (Just seed) False
+                , measureSharePayload revision model.picker (Just seed) False
                 , Process.sleep 700 |> Task.perform (always Reveal)
                 ]
             )
@@ -406,10 +463,36 @@ update msg model =
             , Cmd.none
             )
 
+        ShareMeasured measurement ->
+            if measurement.revision == model.shareRevision then
+                ( { model | shareLength = Just measurement.length }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
 
 updatePicker : (Picker -> Picker) -> Model -> ( Model, Cmd Msg )
 updatePicker transform model =
-    ( { model | picker = transform model.picker, errors = [], notice = Nothing }, Cmd.none )
+    let
+        picker =
+            transform model.picker
+
+        revision =
+            model.shareRevision + 1
+    in
+    ( { model
+        | picker = picker
+        , errors = []
+        , notice = Nothing
+        , seed = Nothing
+        , shareRevision = revision
+        , shareLength = Nothing
+      }
+    , Cmd.batch
+        [ setSharePayload picker Nothing True
+        , measureSharePayload revision picker Nothing True
+        ]
+    )
 
 
 updateGroup : Int -> (Group -> Group) -> Model -> ( Model, Cmd Msg )
@@ -522,11 +605,19 @@ viewBuilder model =
             , viewLivePreview model.picker
             ]
         , div [ class "builder-actions" ]
-            [ div [ class "total-pill", attribute "data-testid" "total-picks" ]
-                [ text (pickLabel (totalPickCount model.picker)) ]
+            [ div [ class "action-metrics" ]
+                [ div [ class "total-pill", attribute "data-testid" "total-picks" ]
+                    [ text (pickLabel (totalPickCount model.picker)) ]
+                , viewShareMeter model.shareLength
+                ]
             , div [ class "action-cluster" ]
                 [ button [ class "button button--secondary", onClick SaveCurrent ] [ text "Save here" ]
-                , button [ class "button button--primary", onClick OpenRun ] [ text "Continue" ]
+                , button
+                    [ class "button button--primary"
+                    , onClick OpenRun
+                    , disabled (not (shareFits model.shareLength))
+                    ]
+                    [ text "Continue" ]
                 ]
             ]
         , viewNotice model.notice
@@ -658,17 +749,6 @@ viewChoiceEditor errors groupIndex groupName choiceIndex choice =
                 , invalidAttribute (hasError fieldId errors)
                 ]
                 []
-            , label [ class "sr-only", for (fieldId ++ "-image") ]
-                [ text (groupName ++ " item " ++ accessibleNumber ++ " image") ]
-            , input
-                [ id (fieldId ++ "-image")
-                , class "image-url"
-                , value choice.imageUrl
-                , onInput (SetChoiceImage groupIndex choiceIndex)
-                , placeholder "Image URL (optional)"
-                , type_ "url"
-                ]
-                []
             ]
         , button
             [ class "icon-button icon-button--small"
@@ -735,7 +815,8 @@ viewRunner model =
             ]
             (List.indexedMap (viewRunGroup model) model.picker.groups)
         , div [ class "run-actions" ]
-            [ button
+            [ viewShareMeter model.shareLength
+            , button
                 [ class "toss-button"
                 , onClick TossNow
                 , disabled (model.tossState == Tossing)
@@ -754,7 +835,7 @@ viewRunner model =
             , button
                 [ class "button button--secondary"
                 , onClick CopyResult
-                , disabled (model.seed == Nothing)
+                , disabled (model.seed == Nothing || not (shareFits model.shareLength))
                 ]
                 [ text "Copy this result" ]
             ]
@@ -823,14 +904,7 @@ viewResultCard : Choice -> Html Msg
 viewResultCard choice =
     articleLike
         [ class "result-card", attribute "data-testid" "result-card" ]
-        ([ if String.isEmpty (String.trim choice.imageUrl) then
-            text ""
-
-           else
-            img [ src choice.imageUrl, attribute "alt" "", attribute "loading" "lazy" ] []
-         , strong [] [ text choice.label ]
-         ]
-        )
+        [ strong [] [ text choice.label ] ]
 
 
 articleLike : List (Html.Attribute msg) -> List (Html msg) -> Html msg
@@ -848,8 +922,63 @@ viewNotice notice =
             text ""
 
 
-setSharePayload : Picker -> Maybe Int -> Cmd Msg
-setSharePayload picker seed =
+maxUrlLength : Int
+maxUrlLength =
+    2000
+
+
+shareFits : Maybe Int -> Bool
+shareFits maybeLength =
+    case maybeLength of
+        Just length ->
+            length <= maxUrlLength
+
+        Nothing ->
+            False
+
+
+viewShareMeter : Maybe Int -> Html Msg
+viewShareMeter maybeLength =
+    let
+        meter content =
+            div [ class "share-length", attribute "data-testid" "share-length" ] [ text content ]
+    in
+    case maybeLength of
+        Nothing ->
+            div [ class "share-status" ] [ meter "Measuring link…" ]
+
+        Just length ->
+            div [ class "share-status" ]
+                [ meter (formatNumber length ++ " / " ++ formatNumber maxUrlLength ++ " characters")
+                , if length > maxUrlLength then
+                    div [ class "share-error", attribute "role" "alert" ]
+                        [ text
+                            ("Picker too large: "
+                                ++ formatNumber length
+                                ++ " / "
+                                ++ formatNumber maxUrlLength
+                                ++ " characters. Shorten labels or remove items."
+                            )
+                        ]
+
+                  else
+                    text ""
+                ]
+
+
+formatNumber : Int -> String
+formatNumber number =
+    if number < 1000 then
+        String.fromInt number
+
+    else
+        formatNumber (number // 1000)
+            ++ ","
+            ++ String.padLeft 3 '0' (String.fromInt (remainderBy 1000 number))
+
+
+setSharePayload : Picker -> Maybe Int -> Bool -> Cmd Msg
+setSharePayload picker seed editing =
     setShare
         (Encode.object
             [ ( "picker", pickerEncoder picker )
@@ -861,6 +990,26 @@ setSharePayload picker seed =
                     Nothing ->
                         Encode.null
               )
+            , ( "editing", Encode.bool editing )
+            ]
+        )
+
+
+measureSharePayload : Int -> Picker -> Maybe Int -> Bool -> Cmd Msg
+measureSharePayload revision picker seed editing =
+    measureShare
+        (Encode.object
+            [ ( "revision", Encode.int revision )
+            , ( "picker", pickerEncoder picker )
+            , ( "seed"
+              , case seed of
+                    Just value_ ->
+                        Encode.int value_
+
+                    Nothing ->
+                        Encode.null
+              )
+            , ( "editing", Encode.bool editing )
             ]
         )
 
@@ -1087,9 +1236,9 @@ defaultPicker =
           , foreground = "#171717"
           , pickCount = 1
           , options =
-                [ { label = "IPA", imageUrl = "" }
-                , { label = "Stout", imageUrl = "" }
-                , { label = "Lager", imageUrl = "" }
+                [ { label = "IPA" }
+                , { label = "Stout" }
+                , { label = "Lager" }
                 ]
           }
         , { name = "Food"
@@ -1097,9 +1246,9 @@ defaultPicker =
           , foreground = "#171717"
           , pickCount = 2
           , options =
-                [ { label = "Burger", imageUrl = "" }
-                , { label = "Pizza", imageUrl = "" }
-                , { label = "Tacos", imageUrl = "" }
+                [ { label = "Burger" }
+                , { label = "Pizza" }
+                , { label = "Tacos" }
                 ]
           }
         , { name = "Weed"
@@ -1107,10 +1256,10 @@ defaultPicker =
           , foreground = "#171717"
           , pickCount = 2
           , options =
-                [ { label = "Runtz", imageUrl = "" }
-                , { label = "Gelato 41", imageUrl = "" }
-                , { label = "Permanent Marker", imageUrl = "" }
-                , { label = "Zkittlez", imageUrl = "" }
+                [ { label = "Runtz" }
+                , { label = "Gelato 41" }
+                , { label = "Permanent Marker" }
+                , { label = "Zkittlez" }
                 ]
           }
         ]
@@ -1128,8 +1277,8 @@ blankPicker id_ =
           , foreground = "#ffffff"
           , pickCount = 1
           , options =
-                [ { label = "First item", imageUrl = "" }
-                , { label = "Second item", imageUrl = "" }
+                [ { label = "First item" }
+                , { label = "Second item" }
                 ]
           }
         ]
@@ -1138,12 +1287,13 @@ blankPicker id_ =
 
 flagsDecoder : Decoder Flags
 flagsDecoder =
-    Decode.map5 Flags
+    Decode.map6 Flags
         (Decode.field "saved" (Decode.list pickerDecoder))
         (Decode.field "shared" (Decode.nullable pickerDecoder))
         (Decode.field "seed" (Decode.nullable Decode.int))
         (Decode.field "sharedError" (Decode.nullable Decode.string))
         (Decode.field "year" Decode.int)
+        (Decode.field "editing" Decode.bool)
 
 
 pickerDecoder : Decoder Picker
@@ -1173,9 +1323,8 @@ groupDecoder =
 
 choiceDecoder : Decoder Choice
 choiceDecoder =
-    Decode.map2 Choice
+    Decode.map Choice
         (Decode.field "label" Decode.string)
-        (Decode.field "imageUrl" Decode.string)
 
 
 pickerEncoder : Picker -> Encode.Value
@@ -1201,6 +1350,4 @@ groupEncoder group =
 choiceEncoder : Choice -> Encode.Value
 choiceEncoder choice =
     Encode.object
-        [ ( "label", Encode.string choice.label )
-        , ( "imageUrl", Encode.string choice.imageUrl )
-        ]
+        [ ( "label", Encode.string choice.label ) ]

@@ -563,16 +563,18 @@ viewHeader model =
 viewBuilder : Model -> Html Msg
 viewBuilder model =
     main_ [ class "builder" ]
-        [ section [ class "builder-grid" ]
-            [ div [ class "editor-column" ]
-                [ section [ class "builder-intro" ]
-                    [ p [ class "lede" ]
-                        [ text "Add one or more lists. Choose how many items to pick from each. "
-                        , a [ class "agent-lede-link", href "/agent" ] [ text "Or\u{00A0}tell your agent what you need to toss" ]
-                        ]
+        [ section [ class "builder-header" ]
+            [ section [ class "builder-intro" ]
+                [ p [ class "lede" ]
+                    [ text "Add one or more lists. Choose how many items to pick from each. "
+                    , a [ class "agent-lede-link", href "/agent" ] [ text "Or\u{00A0}tell your agent what you need to toss" ]
                     ]
-                , viewLocalShelf model
-                , case model.sharedError of
+                ]
+            , viewLocalShelf model
+            ]
+        , section [ class "builder-grid" ]
+            [ div [ class "editor-column" ]
+                [ case model.sharedError of
                     Just sharedError ->
                         div [ class "banner banner--warning", attribute "role" "status" ] [ text sharedError ]
 

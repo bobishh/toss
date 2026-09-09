@@ -563,31 +563,30 @@ viewHeader model =
 viewBuilder : Model -> Html Msg
 viewBuilder model =
     main_ [ class "builder" ]
-        [ section [ class "builder-intro" ]
-            [ h1 [] [ text "What" ]
-            , p [ class "lede" ]
-                [ text "Add one or more lists. Choose how many items to pick from each. "
-                , a [ class "agent-lede-link", href "/agent" ] [ text "Or tell your agent what you need to toss" ]
-                ]
-            ]
-        , viewLocalShelf model
-        , case model.sharedError of
-            Just sharedError ->
-                div [ class "banner banner--warning", attribute "role" "status" ] [ text sharedError ]
-
-            Nothing ->
-                text ""
-        , if List.isEmpty model.errors then
-            text ""
-
-          else
-            div [ class "banner banner--error", attribute "role" "alert" ]
-                [ span [ class "banner-title" ] [ text "Check these:" ]
-                , div [] (model.errors |> uniqueMessages |> List.map (\message -> p [] [ text message ]))
-                ]
-        , section [ class "builder-grid" ]
+        [ section [ class "builder-grid" ]
             [ div [ class "editor-column" ]
-                [ fieldset [ class "title-field" ]
+                [ section [ class "builder-intro" ]
+                    [ p [ class "lede" ]
+                        [ text "Add one or more lists. Choose how many items to pick from each. "
+                        , a [ class "agent-lede-link", href "/agent" ] [ text "Or\u{00A0}tell your agent what you need to toss" ]
+                        ]
+                    ]
+                , viewLocalShelf model
+                , case model.sharedError of
+                    Just sharedError ->
+                        div [ class "banner banner--warning", attribute "role" "status" ] [ text sharedError ]
+
+                    Nothing ->
+                        text ""
+                , if List.isEmpty model.errors then
+                    text ""
+
+                  else
+                    div [ class "banner banner--error", attribute "role" "alert" ]
+                        [ span [ class "banner-title" ] [ text "Check these:" ]
+                        , div [] (model.errors |> uniqueMessages |> List.map (\message -> p [] [ text message ]))
+                        ]
+                , fieldset [ class "title-field" ]
                     [ label [ for "picker-title" ] [ text "Name" ]
                     , input
                         [ id "picker-title"
@@ -1228,38 +1227,37 @@ findPicker saved id_ =
 defaultPicker : Picker
 defaultPicker =
     { id = 1
-    , title = "Dinner toss"
+    , title = "Office toss"
     , mechanic = Toss
     , groups =
-        [ { name = "Beer"
+        [ { name = "Backend"
           , background = "#ffd43b"
           , foreground = "#171717"
           , pickCount = 1
           , options =
-                [ { label = "IPA" }
-                , { label = "Stout" }
-                , { label = "Lager" }
+                [ { label = "Bogdan" }
+                , { label = "Arjun" }
+                , { label = "Lukas" }
                 ]
           }
-        , { name = "Food"
+        , { name = "Frontend"
           , background = "#ff6b35"
           , foreground = "#171717"
-          , pickCount = 2
+          , pickCount = 1
           , options =
-                [ { label = "Burger" }
-                , { label = "Pizza" }
-                , { label = "Tacos" }
+                [ { label = "Rohan" }
+                , { label = "Sophie" }
+                , { label = "Zoe" }
                 ]
           }
-        , { name = "Weed"
+        , { name = "Platform"
           , background = "#69db7c"
           , foreground = "#171717"
-          , pickCount = 2
+          , pickCount = 1
           , options =
-                [ { label = "Runtz" }
-                , { label = "Gelato 41" }
-                , { label = "Permanent Marker" }
-                , { label = "Zkittlez" }
+                [ { label = "Vikram" }
+                , { label = "Neha" }
+                , { label = "Felix" }
                 ]
           }
         ]

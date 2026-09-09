@@ -1,16 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-test('Given three configured lists, When Toss runs, Then grouped results and a reproducible URL appear', async ({ page }) => {
+test('Given three configured teams, When Office Toss runs, Then one candidate per team appears in a reproducible URL', async ({ page }) => {
   await page.goto('/');
 
-  await test.step('Given the default Beer, Food, and Weed lists are editable', async () => {
-    await expect(page.getByRole('heading', { name: 'What', exact: true })).toBeVisible();
+  await test.step('Given the default Backend, Frontend, and Platform lists are editable', async () => {
+    await expect(page.locator('.builder-intro')).toBeVisible();
     await expect(page.locator('.builder-intro').getByText('SET UP', { exact: true })).toHaveCount(0);
     await expect(page.locator('.wordmark')).toHaveText('TOSS (LIKE A BOSS)');
     await expect(page.getByText('Add one or more lists. Choose how many items to pick from each.')).toBeVisible();
-    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Dinner toss');
-    await expect(page.getByTestId('total-picks')).toHaveText('5 picks');
-    await expect(page.getByLabel('Weed item 1', { exact: true })).toHaveValue('Runtz');
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Office toss');
+    await expect(page.getByTestId('total-picks')).toHaveText('3 picks');
+    await expect(page.getByLabel('Backend item 1', { exact: true })).toHaveValue('Bogdan');
     await expect(page.getByPlaceholder('Image URL (optional)')).toHaveCount(0);
     await expect(page.getByTestId('share-length')).toHaveText(/^\d+ \/ 2,000 characters$/);
     await expect(page.getByText('ELM 0.19.2')).toHaveCount(0);
@@ -19,18 +19,18 @@ test('Given three configured lists, When Toss runs, Then grouped results and a r
   });
 
   await test.step('When group colors change and the Run screen opens', async () => {
-    await page.getByLabel('Beer card color').fill('#123456');
+    await page.getByLabel('Backend card color').fill('#123456');
     await page.getByRole('button', { name: 'Continue' }).click();
-    await expect(page.getByRole('heading', { name: 'Dinner toss' })).toBeVisible();
-    await expect(page.getByTestId('run-group-Beer')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+    await expect(page.getByRole('heading', { name: 'Office toss' })).toBeVisible();
+    await expect(page.getByTestId('run-group-Backend')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
     const pickerLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
     expect(pickerLength).toBe(`https://toss.quitter.live/${await page.evaluate(() => location.hash)}`.length);
   });
 
-  await test.step('Then Toss reveals one beer, two unique foods, and two unique strains', async () => {
+  await test.step('Then Toss reveals one unique candidate from each team', async () => {
     const hashBefore = await page.evaluate(() => location.hash);
-    await page.getByRole('button', { name: 'Toss 5 picks' }).click();
-    await expect(page.getByTestId('result-card')).toHaveCount(5);
+    await page.getByRole('button', { name: 'Toss 3 picks' }).click();
+    await expect(page.getByTestId('result-card')).toHaveCount(3);
     await expect(page.getByTestId('result-card').nth(0)).toBeVisible();
     await expect.poll(() => page.evaluate(() => location.hash)).not.toBe(hashBefore);
     const resultHash = await page.evaluate(() => location.hash);
@@ -39,17 +39,16 @@ test('Given three configured lists, When Toss runs, Then grouped results and a r
     const resultLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
     expect(resultLength).toBe(`https://toss.quitter.live/${resultHash}`.length);
 
-    const foods = await page.getByTestId('result-group-Food').getByTestId('result-card').allTextContents();
-    expect(new Set(foods).size).toBe(2);
-    const strains = await page.getByTestId('result-group-Weed').getByTestId('result-card').allTextContents();
-    expect(new Set(strains).size).toBe(2);
+    await expect(page.getByTestId('result-group-Backend').getByTestId('result-card')).toHaveCount(1);
+    await expect(page.getByTestId('result-group-Frontend').getByTestId('result-card')).toHaveCount(1);
+    await expect(page.getByTestId('result-group-Platform').getByTestId('result-card')).toHaveCount(1);
   });
 
   await test.step('And the result URL reproduces in a clean browser page', async () => {
     const resultUrl = page.url();
     const fresh = await page.context().newPage();
     await fresh.goto(resultUrl);
-    await expect(fresh.getByTestId('result-card')).toHaveCount(5);
+    await expect(fresh.getByTestId('result-card')).toHaveCount(3);
     expect(await fresh.getByTestId('result-card').allTextContents()).toEqual(
       await page.getByTestId('result-card').allTextContents(),
     );
@@ -58,30 +57,30 @@ test('Given three configured lists, When Toss runs, Then grouped results and a r
 
 test('Given an empty option, When Run is requested, Then the builder explains the failure', async ({ page }) => {
   await page.goto('/');
-  const firstBeer = page.getByRole('textbox', { name: 'Beer item 1', exact: true });
-  await firstBeer.fill('');
+  const firstBackend = page.getByRole('textbox', { name: 'Backend item 1', exact: true });
+  await firstBackend.fill('');
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  await expect(page.getByRole('heading', { name: 'What', exact: true })).toBeVisible();
+  await expect(page.locator('.builder-intro')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('Fill in every item.');
-  await expect(firstBeer).toHaveAttribute('aria-invalid', 'true');
+  await expect(firstBackend).toHaveAttribute('aria-invalid', 'true');
 });
 
 test('Given an unfinished toss, Then its editing and run states survive sharing and Change', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Name', { exact: true }).fill('Still choosing');
-  await page.getByRole('textbox', { name: 'Beer item 1', exact: true }).fill('Pilsner');
+  await page.getByRole('textbox', { name: 'Backend item 1', exact: true }).fill('Pilsner');
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#e\.[A-Za-z0-9_-]+$/);
 
   const editingUrl = page.url();
   const fresh = await page.context().newPage();
   await fresh.goto(editingUrl);
-  await expect(fresh.getByRole('heading', { name: 'What', exact: true })).toBeVisible();
+  await expect(fresh.locator('.builder-intro')).toBeVisible();
   await expect(fresh.getByLabel('Name', { exact: true })).toHaveValue('Still choosing');
-  await expect(fresh.getByRole('textbox', { name: 'Beer item 1', exact: true })).toHaveValue('Pilsner');
+  await expect(fresh.getByRole('textbox', { name: 'Backend item 1', exact: true })).toHaveValue('Pilsner');
   await fresh.reload();
   await expect(fresh.getByLabel('Name', { exact: true })).toHaveValue('Still choosing');
-  await expect(fresh.getByRole('textbox', { name: 'Beer item 1', exact: true })).toHaveValue('Pilsner');
+  await expect(fresh.getByRole('textbox', { name: 'Backend item 1', exact: true })).toHaveValue('Pilsner');
 
   await fresh.getByRole('button', { name: 'Continue' }).click();
   await expect.poll(() => fresh.evaluate(() => location.hash)).toMatch(/^#r\.[A-Za-z0-9_-]+$/);
@@ -92,7 +91,7 @@ test('Given an unfinished toss, Then its editing and run states survive sharing 
 
 test('Given an encoded URL above 2,000 characters, Then its exact size is shown and Continue is disabled', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Beer item 1', exact: true }).fill('x'.repeat(1800));
+  await page.getByRole('textbox', { name: 'Backend item 1', exact: true }).fill('x'.repeat(1800));
 
   const meter = page.getByTestId('share-length');
   await expect(meter).toHaveText(/^\d{1,3},\d{3} \/ 2,000 characters$/);
@@ -127,9 +126,9 @@ test('Given local presets, When two tosses are saved, Then both survive reload',
 test('Given a damaged shared payload, Then Toss recovers without touching the builder', async ({ page }) => {
   await page.goto('/#%%%');
 
-  await expect(page.getByRole('heading', { name: 'What', exact: true })).toBeVisible();
+  await expect(page.locator('.builder-intro')).toBeVisible();
   await expect(page.getByRole('status')).toContainText('link is damaged');
-  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Dinner toss');
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Office toss');
 });
 
 test('Given a mobile viewport, Then the builder fits without horizontal scrolling', async ({ page }, testInfo) => {
@@ -143,6 +142,39 @@ test('Given a mobile viewport, Then the builder fits without horizontal scrollin
 
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
   await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+});
+
+test('Given a desktop builder, Then the intro and preview stay compact while group forms use two columns', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.goto('/');
+
+  const layout = await page.evaluate(() => {
+    const rect = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`Missing ${selector}`);
+      const box = element.getBoundingClientRect();
+      return { top: box.top, width: box.width };
+    };
+
+    const cards = [...document.querySelectorAll<HTMLElement>('.group-card')].map((card) => {
+      const box = card.getBoundingClientRect();
+      return { top: box.top, width: box.width };
+    });
+
+    return {
+      intro: rect('.builder-intro'),
+      preview: rect('.preview-sticky'),
+      editor: rect('.editor-column'),
+      cards,
+      viewport: document.documentElement.clientWidth,
+      content: document.documentElement.scrollWidth,
+    };
+  });
+
+  expect(layout.preview.top).toBeLessThan(layout.cards[0].top);
+  expect(Math.abs(layout.cards[0].top - layout.cards[1].top)).toBeLessThan(1);
+  expect(layout.cards[0].width).toBeLessThan(layout.editor.width * 0.7);
+  expect(layout.content).toBeLessThanOrEqual(layout.viewport);
 });
 
 test('Given the agent page, When Copy is pressed, Then the complete link recipe reaches the clipboard', async ({ page, context }) => {

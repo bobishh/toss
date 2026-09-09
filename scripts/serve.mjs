@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const index = readFileSync(join(root, 'dist', 'index.html'));
+const port = Number(process.env.PORT ?? '4243');
 
 const server = createServer((request, response) => {
   const url = new URL(request.url || '/', 'http://127.0.0.1');
@@ -28,6 +29,6 @@ const server = createServer((request, response) => {
   response.end('Not found\n');
 });
 
-server.listen(4243, '127.0.0.1', () => {
-  console.log('Serving Toss at http://127.0.0.1:4243');
+server.listen(port, '127.0.0.1', () => {
+  console.log(`Serving Toss at http://127.0.0.1:${port}`);
 });

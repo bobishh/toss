@@ -40,7 +40,7 @@
     .mode-indicator { display: flex; align-items: center; gap: 10px; font: 800 .76rem/1 ui-monospace, monospace; letter-spacing: .12em; }
     .mode-number { display: grid; place-items: center; width: 34px; height: 34px; color: white; background: var(--ink); border-radius: 50%; letter-spacing: 0; }
 
-    .builder, .runner { flex: 1; width: min(1480px, 100%); margin: 0 auto; padding: 0 clamp(16px, 4vw, 56px) 110px; }
+    .builder, .runner { flex: 1; width: min(1480px, 100%); margin: 0 auto; padding: clamp(16px, 1.5vw, 24px) clamp(16px, 4vw, 56px) 110px; }
     .builder-intro { max-width: 760px; margin-bottom: 18px; }
     .builder-intro h1 { margin-bottom: 10px; font-size: clamp(2.8rem, 5vw, 4.8rem); }
     .eyebrow { font: 800 .72rem/1.2 ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; margin-bottom: 14px; }
@@ -196,7 +196,7 @@
 
     @media (max-width: 620px) {
       .topbar { height: 64px; }
-      .builder, .runner { padding-top: 0; }
+      .builder, .runner { padding-top: 16px; }
       .local-shelf { grid-template-columns: 1fr auto; }
       .local-shelf > label { grid-column: 1 / -1; }
       .group-card { box-shadow: 4px 4px 0 var(--ink); }

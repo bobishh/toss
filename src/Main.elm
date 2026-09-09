@@ -240,7 +240,7 @@ update msg model =
                 (\group ->
                     let
                         maximum =
-                            max 1 (List.length group.options)
+                            maximumPickCount group.options
                     in
                     { group | pickCount = clamp 1 maximum (group.pickCount + delta) }
                 )
@@ -272,7 +272,7 @@ update msg model =
                     in
                     { group
                         | options = remaining
-                        , pickCount = min group.pickCount (max 1 (List.length remaining))
+                        , pickCount = min group.pickCount (maximumPickCount remaining)
                     }
                 )
                 model
@@ -691,7 +691,7 @@ viewGroupEditor errors groupIndex group =
                 , button
                     [ class "stepper"
                     , onClick (ChangePickCount groupIndex 1)
-                    , disabled (group.pickCount >= List.length group.options)
+                    , disabled (group.pickCount >= maximumPickCount group.options)
                     , attribute "aria-label" ("Increase " ++ safeName ++ " picks")
                     ]
                     [ text "+" ]
@@ -1063,9 +1063,15 @@ validateGroup groupIndex group =
                     )
                 |> List.concat
 
+        usableOptions =
+            List.filter (\choice -> not (String.isEmpty (String.trim choice.label))) group.options
+
         countErrors =
-            if group.pickCount > List.length (List.filter (\choice -> not (String.isEmpty (String.trim choice.label))) group.options) then
-                [ { key = prefix ++ "-count", message = "You cannot take more items than this list has." } ]
+            if List.length usableOptions < 2 then
+                [ { key = prefix ++ "-count", message = "Add at least two items to every list." } ]
+
+            else if group.pickCount < 1 || group.pickCount > maximumPickCount usableOptions then
+                [ { key = prefix ++ "-count", message = "Leave at least one item out of every toss." } ]
 
             else
                 []
@@ -1083,6 +1089,11 @@ selectedChoices seed groupIndex group =
         |> List.sortBy (\( score, choiceIndex, _ ) -> score + choiceIndex)
         |> List.take group.pickCount
         |> List.map (\( _, _, choice ) -> choice)
+
+
+maximumPickCount : List Choice -> Int
+maximumPickCount options =
+    max 1 (List.length options - 1)
 
 
 pseudoScore : Int -> Int -> Int -> Int

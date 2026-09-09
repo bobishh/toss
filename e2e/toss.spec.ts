@@ -66,6 +66,19 @@ test('Given an empty option, When Run is requested, Then the builder explains th
   await expect(firstBackend).toHaveAttribute('aria-invalid', 'true');
 });
 
+test('Given a list with two remaining items, Then Take stops at one so a toss cannot select everything', async ({ page }) => {
+  await page.goto('/');
+
+  const increase = page.getByRole('button', { name: 'Increase Backend picks' });
+  await increase.click();
+  await expect(page.locator('.pick-control').first().locator('strong')).toHaveText('2');
+
+  await page.getByRole('button', { name: 'Remove Backend item 3' }).click();
+  await expect(page.locator('.pick-control').first().locator('strong')).toHaveText('1');
+  await expect(increase).toBeDisabled();
+  await expect(page.getByText('FROM 2', { exact: true }).first()).toBeVisible();
+});
+
 test('Given an unfinished toss, Then its editing and run states survive sharing and Change', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Name', { exact: true }).fill('Still choosing');

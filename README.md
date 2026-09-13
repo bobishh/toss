@@ -1,6 +1,6 @@
 # Toss
 
-[toss.quitter.live](https://toss.quitter.live)
+[toss.meta-uber-engineer.dev](https://toss.meta-uber-engineer.dev)
 
 Build grouped random selectors. Run them locally. Share complete selectors and
 deterministic results through URL fragments.
@@ -26,7 +26,7 @@ application, styles, local persistence bridge, and positional Base64URL codec.
 
 ## Agent prompt
 
-Open [toss.quitter.live/agent](https://toss.quitter.live/agent) for a copyable
+Open [toss.meta-uber-engineer.dev/agent](https://toss.meta-uber-engineer.dev/agent) for a copyable
 prompt containing the complete binary codec and reference link encoder.
 
 ## Container

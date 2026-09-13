@@ -260,16 +260,16 @@
   <div id="app"></div>
   <script>/*__ELM_BUNDLE__*/</script>
   <script id="agent-prompt-source" type="text/plain">
-You create shareable Toss links. Toss is a static picker at https://toss.quitter.live/. It has no API, upload, account, or server-side state. Encode the complete picker into the URL fragment.
+You create shareable Toss links. Toss is a static picker at https://toss.meta-uber-engineer.dev/. It has no API, upload, account, or server-side state. Encode the complete picker into the URL fragment.
 
 Return:
-https://toss.quitter.live/#r.PAYLOAD
+https://toss.meta-uber-engineer.dev/#r.PAYLOAD
 
 For an unfinished picker that should reopen in the editor:
-https://toss.quitter.live/#e.PAYLOAD
+https://toss.meta-uber-engineer.dev/#e.PAYLOAD
 
 For a reproducible result, append a positive base-36 seed:
-https://toss.quitter.live/#r.PAYLOAD~SEED
+https://toss.meta-uber-engineer.dev/#r.PAYLOAD~SEED
 
 Input model:
 {
@@ -383,7 +383,7 @@ function makeTossUrl(picker, seed = null, editing = false) {
   if (seed != null && (!Number.isSafeInteger(seed) || seed < 1 || seed > 0x7fffffff)) throw new Error("Invalid seed");
   const mode = editing ? "e." : "r.";
   const result = seed == null ? payload : `${payload}~${seed.toString(36)}`;
-  const url = `https://toss.quitter.live/#${mode}${result}`;
+  const url = `https://toss.meta-uber-engineer.dev/#${mode}${result}`;
   if (url.length > MAX_URL_LENGTH) {
     throw new Error(`Picker too large: ${url.length.toLocaleString("en-US")} / ${MAX_URL_LENGTH.toLocaleString("en-US")} characters. Shorten labels or remove items.`);
   }
@@ -415,7 +415,7 @@ function makeTossUrl(picker, seed = null, editing = false) {
       }
 
       const STORAGE_KEY = 'toss:pickers:v1';
-      const SHARE_ORIGIN = 'https://toss.quitter.live/';
+      const SHARE_ORIGIN = 'https://toss.meta-uber-engineer.dev/';
       const MAX_URL_LENGTH = 2_000;
       const encoder = new TextEncoder();
       const decoder = new TextDecoder('utf-8', { fatal: true });

@@ -24,7 +24,7 @@ test('Given three configured teams, When Office Toss runs, Then one candidate pe
     await expect(page.getByRole('heading', { name: 'Office toss' })).toBeVisible();
     await expect(page.getByTestId('run-group-Backend')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
     const pickerLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
-    expect(pickerLength).toBe(`https://toss.quitter.live/${await page.evaluate(() => location.hash)}`.length);
+    expect(pickerLength).toBe(`https://toss.meta-uber-engineer.dev/${await page.evaluate(() => location.hash)}`.length);
   });
 
   await test.step('Then Toss reveals one unique candidate from each team', async () => {
@@ -37,7 +37,7 @@ test('Given three configured teams, When Office Toss runs, Then one candidate pe
     expect(resultHash).toMatch(/^#r\.[A-Za-z0-9_-]+~[0-9a-z]+$/);
     expect(resultHash).not.toContain('IPA');
     const resultLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
-    expect(resultLength).toBe(`https://toss.quitter.live/${resultHash}`.length);
+    expect(resultLength).toBe(`https://toss.meta-uber-engineer.dev/${resultHash}`.length);
 
     await expect(page.getByTestId('result-group-Backend').getByTestId('result-card')).toHaveCount(1);
     await expect(page.getByTestId('result-group-Frontend').getByTestId('result-card')).toHaveCount(1);
@@ -200,7 +200,7 @@ test('Given the agent page, When Copy is pressed, Then the complete link recipe 
   await expect(page.getByTestId('agent-prompt')).toContainText('image slot is always an empty string');
   await page.getByRole('button', { name: 'Copy prompt' }).click();
   await expect(page.getByRole('status')).toHaveText('Copied.');
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('https://toss.quitter.live/#');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('https://toss.meta-uber-engineer.dev/#');
 
   const generatedUrl = await page.evaluate(() => {
     const prompt = document.querySelector('[data-testid="agent-prompt"]')?.textContent || '';

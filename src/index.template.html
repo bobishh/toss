@@ -595,7 +595,12 @@ function makeTossUrl(picker, seed = null, editing = false) {
       const sharedFlags = loadShared();
       const app = Elm.Main.init({
         node: document.getElementById('app'),
-        flags: { saved: loadSaved(), ...sharedFlags, year: new Date().getFullYear() },
+        flags: {
+          saved: loadSaved(),
+          ...sharedFlags,
+          year: new Date().getFullYear(),
+          defaultPickerIndex: Number('__DEFAULT_PICKER_INDEX__') || 0,
+        },
       });
 
       app.ports.persist.subscribe(saved => {

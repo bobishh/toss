@@ -1,16 +1,92 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test('Given three configured teams, When Office Toss runs, Then one candidate per team appears in a reproducible URL', async ({ page }) => {
+const presetTitles = [
+  'Technology toss',
+  'Which subscription to cancel?',
+  'What should we eat?',
+  'Where should we go on vacation?',
+];
+
+const presetOptionCounts = [30, 40, 48, 48];
+const presetGroupCounts = [3, 4, 3, 4];
+const presetPickCounts = [3, 8, 3, 8];
+
+function presetIndex(identity: string, userAgent: string) {
+  let hash = 2166136261;
+  for (const byte of new TextEncoder().encode(`${identity}\n${userAgent}`)) {
+    hash ^= byte;
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % presetTitles.length;
+}
+
+async function identityForPreset(page: Page, target: number) {
+  const userAgent = await page.evaluate(() => navigator.userAgent);
+  for (let suffix = 1; suffix < 1000; suffix += 1) {
+    const identity = `203.0.113.${suffix}`;
+    if (presetIndex(identity, userAgent) === target) return identity;
+  }
+  throw new Error(`Could not find identity for preset ${target}`);
+}
+
+async function usePreset(page: Page, target: number) {
+  const identity = await identityForPreset(page, target);
+  await page.setExtraHTTPHeaders({ 'x-forwarded-for': identity });
+}
+
+test('Given four visitors, When Toss opens, Then IP plus user agent assigns every stable starter', async ({ page, context }) => {
+  for (let index = 0; index < presetTitles.length; index += 1) {
+    const visitor = index === 0 ? page : await context.newPage();
+    await usePreset(visitor, index);
+    await visitor.goto('/');
+    await expect(visitor.getByLabel('Name', { exact: true })).toHaveValue(presetTitles[index]);
+    await expect(visitor.locator('.choice-row')).toHaveCount(presetOptionCounts[index]);
+    await expect(visitor.locator('.group-card')).toHaveCount(presetGroupCounts[index]);
+    await expect(visitor.getByTestId('total-picks')).toHaveText(`${presetPickCounts[index]} picks`);
+    await expect(visitor.getByRole('button', { name: 'Continue' })).toBeEnabled();
+    await visitor.reload();
+    await expect(visitor.getByLabel('Name', { exact: true })).toHaveValue(presetTitles[index]);
+  }
+});
+
+test('Given lively starter content, Then subscriptions name real services and food builds a complete order', async ({ page, context }) => {
+  await usePreset(page, 1);
+  await page.goto('/');
+  await expect(page.getByLabel('Listen & read item 1', { exact: true })).toHaveValue('Spotify');
+  await expect(page.locator('.pick-control strong')).toHaveText(['2', '2', '2', '2']);
+
+  const food = await context.newPage();
+  await usePreset(food, 2);
+  await food.goto('/');
+  await expect(food.getByLabel('Starter / salad item 1', { exact: true })).toHaveValue('Caesar salad');
+  await expect(food.getByLabel('Main item 1', { exact: true })).toHaveValue('Ramen');
+  await expect(food.getByLabel('Drink item 1', { exact: true })).toHaveValue('Sparkling water');
+});
+
+test('Given no forwarded IP, When Toss opens, Then socket IP still selects a stable usable starter', async ({ page }) => {
   await page.goto('/');
 
-  await test.step('Given the default Backend, Frontend, and Platform lists are editable', async () => {
+  const title = await page.getByLabel('Name', { exact: true }).inputValue();
+  expect(presetTitles).toContain(title);
+  await page.reload();
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue(title);
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeEnabled();
+});
+
+test('Given three technology lists, When Technology toss runs, Then one technology per layer appears in a reproducible URL', async ({ page }) => {
+  await usePreset(page, 0);
+  await page.goto('/');
+
+  await test.step('Given the default Frontend, Backend, and Database lists are editable', async () => {
     await expect(page.locator('.builder-intro')).toBeVisible();
     await expect(page.locator('.builder-intro').getByText('SET UP', { exact: true })).toHaveCount(0);
     await expect(page.locator('.wordmark')).toHaveText('TOSS (LIKE A BOSS)');
     await expect(page.getByText('Add one or more lists. Choose how many items to pick from each.')).toBeVisible();
-    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Office toss');
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Technology toss');
     await expect(page.getByTestId('total-picks')).toHaveText('3 picks');
-    await expect(page.getByLabel('Backend item 1', { exact: true })).toHaveValue('Bogdan');
+    await expect(page.getByLabel('Frontend item 1', { exact: true })).toHaveValue('React');
+    await expect(page.getByLabel('Backend item 1', { exact: true })).toHaveValue('Elixir / Phoenix');
+    await expect(page.getByLabel('Database item 1', { exact: true })).toHaveValue('PostgreSQL');
     await expect(page.getByPlaceholder('Image URL (optional)')).toHaveCount(0);
     await expect(page.getByTestId('share-length')).toHaveText(/^\d+ \/ 2,000 characters$/);
     await expect(page.getByText('ELM 0.19.2')).toHaveCount(0);
@@ -19,10 +95,10 @@ test('Given three configured teams, When Office Toss runs, Then one candidate pe
   });
 
   await test.step('When group colors change and the Run screen opens', async () => {
-    await page.getByLabel('Backend card color').fill('#123456');
+    await page.getByLabel('Frontend card color').fill('#123456');
     await page.getByRole('button', { name: 'Continue' }).click();
-    await expect(page.getByRole('heading', { name: 'Office toss' })).toBeVisible();
-    await expect(page.getByTestId('run-group-Backend')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+    await expect(page.getByRole('heading', { name: 'Technology toss' })).toBeVisible();
+    await expect(page.getByTestId('run-group-Frontend')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
     const pickerLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
     expect(pickerLength).toBe(`https://toss.meta-uber-engineer.dev/${await page.evaluate(() => location.hash)}`.length);
   });
@@ -39,9 +115,9 @@ test('Given three configured teams, When Office Toss runs, Then one candidate pe
     const resultLength = Number((await page.getByTestId('share-length').textContent())?.split(' ')[0].replace(',', ''));
     expect(resultLength).toBe(`https://toss.meta-uber-engineer.dev/${resultHash}`.length);
 
-    await expect(page.getByTestId('result-group-Backend').getByTestId('result-card')).toHaveCount(1);
     await expect(page.getByTestId('result-group-Frontend').getByTestId('result-card')).toHaveCount(1);
-    await expect(page.getByTestId('result-group-Platform').getByTestId('result-card')).toHaveCount(1);
+    await expect(page.getByTestId('result-group-Backend').getByTestId('result-card')).toHaveCount(1);
+    await expect(page.getByTestId('result-group-Database').getByTestId('result-card')).toHaveCount(1);
   });
 
   await test.step('And the result URL reproduces in a clean browser page', async () => {
@@ -56,33 +132,38 @@ test('Given three configured teams, When Office Toss runs, Then one candidate pe
 });
 
 test('Given an empty option, When Run is requested, Then the builder explains the failure', async ({ page }) => {
+  await usePreset(page, 0);
   await page.goto('/');
-  const firstBackend = page.getByRole('textbox', { name: 'Backend item 1', exact: true });
-  await firstBackend.fill('');
+  const firstFrontend = page.getByRole('textbox', { name: 'Frontend item 1', exact: true });
+  await firstFrontend.fill('');
   await page.getByRole('button', { name: 'Continue' }).click();
 
   await expect(page.locator('.builder-intro')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('Fill in every item.');
-  await expect(firstBackend).toHaveAttribute('aria-invalid', 'true');
+  await expect(firstFrontend).toHaveAttribute('aria-invalid', 'true');
 });
 
 test('Given a list with two remaining items, Then Take stops at one so a toss cannot select everything', async ({ page }) => {
+  await usePreset(page, 0);
   await page.goto('/');
 
-  const increase = page.getByRole('button', { name: 'Increase Backend picks' });
+  const increase = page.getByRole('button', { name: 'Increase Frontend picks' });
   await increase.click();
   await expect(page.locator('.pick-control').first().locator('strong')).toHaveText('2');
 
-  await page.getByRole('button', { name: 'Remove Backend item 3' }).click();
+  for (let item = 10; item >= 3; item -= 1) {
+    await page.getByRole('button', { name: `Remove Frontend item ${item}` }).click();
+  }
   await expect(page.locator('.pick-control').first().locator('strong')).toHaveText('1');
   await expect(increase).toBeDisabled();
   await expect(page.getByText('FROM 2', { exact: true }).first()).toBeVisible();
 });
 
 test('Given an unfinished toss, Then its editing and run states survive sharing and Change', async ({ page }) => {
+  await usePreset(page, 0);
   await page.goto('/');
   await page.getByLabel('Name', { exact: true }).fill('Still choosing');
-  await page.getByRole('textbox', { name: 'Backend item 1', exact: true }).fill('Pilsner');
+  await page.getByRole('textbox', { name: 'Frontend item 1', exact: true }).fill('Pilsner');
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#e\.[A-Za-z0-9_-]+$/);
 
   const editingUrl = page.url();
@@ -90,10 +171,10 @@ test('Given an unfinished toss, Then its editing and run states survive sharing 
   await fresh.goto(editingUrl);
   await expect(fresh.locator('.builder-intro')).toBeVisible();
   await expect(fresh.getByLabel('Name', { exact: true })).toHaveValue('Still choosing');
-  await expect(fresh.getByRole('textbox', { name: 'Backend item 1', exact: true })).toHaveValue('Pilsner');
+  await expect(fresh.getByRole('textbox', { name: 'Frontend item 1', exact: true })).toHaveValue('Pilsner');
   await fresh.reload();
   await expect(fresh.getByLabel('Name', { exact: true })).toHaveValue('Still choosing');
-  await expect(fresh.getByRole('textbox', { name: 'Backend item 1', exact: true })).toHaveValue('Pilsner');
+  await expect(fresh.getByRole('textbox', { name: 'Frontend item 1', exact: true })).toHaveValue('Pilsner');
 
   await fresh.getByRole('button', { name: 'Continue' }).click();
   await expect.poll(() => fresh.evaluate(() => location.hash)).toMatch(/^#r\.[A-Za-z0-9_-]+$/);
@@ -103,8 +184,9 @@ test('Given an unfinished toss, Then its editing and run states survive sharing 
 });
 
 test('Given an encoded URL above 2,000 characters, Then its exact size is shown and Continue is disabled', async ({ page }) => {
+  await usePreset(page, 0);
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Backend item 1', exact: true }).fill('x'.repeat(1800));
+  await page.getByRole('textbox', { name: 'Frontend item 1', exact: true }).fill('x'.repeat(1800));
 
   const meter = page.getByTestId('share-length');
   await expect(meter).toHaveText(/^\d{1,3},\d{3} \/ 2,000 characters$/);
@@ -137,15 +219,17 @@ test('Given local presets, When two tosses are saved, Then both survive reload',
 });
 
 test('Given a damaged shared payload, Then Toss recovers without touching the builder', async ({ page }) => {
+  await usePreset(page, 0);
   await page.goto('/#%%%');
 
   await expect(page.locator('.builder-intro')).toBeVisible();
   await expect(page.getByRole('status')).toContainText('link is damaged');
-  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Office toss');
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Technology toss');
 });
 
 test('Given a mobile viewport, Then the builder fits without horizontal scrolling', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile');
+  await usePreset(page, 0);
   await page.goto('/');
 
   const sizes = await page.evaluate(() => ({
@@ -159,6 +243,7 @@ test('Given a mobile viewport, Then the builder fits without horizontal scrollin
 
 test('Given a desktop builder, Then the intro and preview stay compact while group forms use two columns', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
+  await usePreset(page, 0);
   await page.goto('/');
 
   const layout = await page.evaluate(() => {

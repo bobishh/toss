@@ -5,6 +5,10 @@
 Build grouped random selectors. Run them locally. Share complete selectors and
 deterministic results through URL fragments.
 
+New visitors receive one of four editable starters—Technology, Subscription,
+Food, or Vacation—selected consistently from proxy IP plus User-Agent. Shared
+links and locally saved tosses override the starter.
+
 ## Development
 
 ```sh

@@ -18,6 +18,16 @@ Examples:
 
 ## Primary flow
 
+### Starter assignment
+
+For a visitor without a shared URL or locally saved selector, the host assigns
+one of four editable starters: Technology, Subscription, Food, or Vacation.
+Nginx `split_clients` hashes the request's forwarded IP and User-Agent, matching
+the deterministic hero assignment used by meta-uber-engineer. The same browser
+and network receive the same starter. The IP is not returned to browser code or
+stored in application state. Shared URLs and locally saved selectors take
+priority.
+
 ### Step 1: Build
 
 The user:
@@ -165,6 +175,12 @@ invalid shared payload opens the builder with an explanation; local selectors
 remain untouched.
 
 ## MVP acceptance scenarios
+
+### Stable starter
+
+Given repeated requests with the same forwarded IP and User-Agent,
+when Toss opens without shared or local data,
+then the same one of four starters appears and is immediately usable.
 
 ### Happy path
 

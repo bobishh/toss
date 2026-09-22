@@ -103,6 +103,7 @@ type alias Flags =
     , sharedError : Maybe String
     , year : Int
     , editing : Bool
+    , defaultPickerIndex : Int
     }
 
 
@@ -158,6 +159,7 @@ init rawFlags =
                     , sharedError = Just "Saved data could not be opened. Starting fresh."
                     , year = 2026
                     , editing = False
+                    , defaultPickerIndex = 0
                     }
 
         picker =
@@ -168,7 +170,7 @@ init rawFlags =
                 Nothing ->
                     flags.saved
                         |> List.head
-                        |> Maybe.withDefault defaultPicker
+                        |> Maybe.withDefault (defaultPicker flags.defaultPickerIndex)
 
         initialScreen =
             case flags.shared of
@@ -523,7 +525,7 @@ view model =
                 , path [ SvgAttr.d "M32 39 L25 84 M32 39 L39 84 M21 84 H43" ] []
                 ]
             , span [ class "footer-copy" ]
-                [ text ("tossed together @ berlin " ++ String.fromInt model.year) ]
+                [ text ("Berlin · " ++ String.fromInt model.year) ]
             ]
         ]
 
@@ -1237,44 +1239,344 @@ findPicker saved id_ =
     saved |> List.filter (\picker -> picker.id == id_) |> List.head
 
 
-defaultPicker : Picker
-defaultPicker =
+defaultPicker : Int -> Picker
+defaultPicker index =
+    defaultPickers
+        |> List.drop (remainderBy (List.length defaultPickers) index)
+        |> List.head
+        |> Maybe.withDefault technologyPicker
+
+
+defaultPickers : List Picker
+defaultPickers =
+    [ technologyPicker
+    , subscriptionPicker
+    , foodPicker
+    , vacationPicker
+    ]
+
+
+technologyPicker : Picker
+technologyPicker =
     { id = 1
-    , title = "Office toss"
+    , title = "Technology toss"
     , mechanic = Toss
     , groups =
-        [ { name = "Backend"
+        [ { name = "Frontend"
           , background = "#ffd43b"
           , foreground = "#171717"
           , pickCount = 1
           , options =
-                [ { label = "Bogdan" }
-                , { label = "Arjun" }
-                , { label = "Lukas" }
-                ]
+                choices
+                    [ "React"
+                    , "Vue"
+                    , "Svelte"
+                    , "SolidJS"
+                    , "Angular"
+                    , "Lit"
+                    , "Elm"
+                    , "HTMX"
+                    , "Qwik"
+                    , "Astro"
+                    ]
           }
-        , { name = "Frontend"
+        , { name = "Backend"
           , background = "#ff6b35"
           , foreground = "#171717"
           , pickCount = 1
           , options =
-                [ { label = "Rohan" }
-                , { label = "Sophie" }
-                , { label = "Zoe" }
-                ]
+                choices
+                    [ "Elixir / Phoenix"
+                    , "Ruby on Rails"
+                    , "Go"
+                    , "Rust / Axum"
+                    , "Kotlin / Ktor"
+                    , "TypeScript / NestJS"
+                    , "Python / FastAPI"
+                    , "C# / .NET"
+                    , "Java / Spring Boot"
+                    , "Gleam"
+                    ]
           }
-        , { name = "Platform"
+        , { name = "Database"
           , background = "#69db7c"
           , foreground = "#171717"
           , pickCount = 1
           , options =
-                [ { label = "Vikram" }
-                , { label = "Neha" }
-                , { label = "Felix" }
-                ]
+                choices
+                    [ "PostgreSQL"
+                    , "SQLite"
+                    , "MySQL"
+                    , "ClickHouse"
+                    , "DuckDB"
+                    , "MongoDB"
+                    , "Redis"
+                    , "Neo4j"
+                    , "CockroachDB"
+                    , "SurrealDB"
+                    ]
           }
         ]
     }
+
+
+subscriptionPicker : Picker
+subscriptionPicker =
+    { id = 2
+    , title = "Which subscription to cancel?"
+    , mechanic = Toss
+    , groups =
+        [ { name = "Watch"
+          , background = "#ff6b35"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Netflix"
+                    , "Disney+"
+                    , "Prime Video"
+                    , "Apple TV+"
+                    , "HBO Max"
+                    , "MUBI"
+                    , "DAZN"
+                    , "Crunchyroll"
+                    , "Paramount+"
+                    , "Local TV package"
+                    ]
+          }
+        , { name = "Listen & read"
+          , background = "#69db7c"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Spotify"
+                    , "Apple Music"
+                    , "YouTube Premium"
+                    , "Audible"
+                    , "Kindle Unlimited"
+                    , "Storytel"
+                    , "Blinkist"
+                    , "Medium"
+                    , "Paid newsletter"
+                    , "News paywall"
+                    ]
+          }
+        , { name = "Work & create"
+          , background = "#74c0fc"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Adobe Creative Cloud"
+                    , "Microsoft 365"
+                    , "Google One"
+                    , "iCloud+"
+                    , "Dropbox"
+                    , "Notion"
+                    , "Todoist"
+                    , "Canva Pro"
+                    , "ChatGPT Plus"
+                    , "GitHub Copilot"
+                    ]
+          }
+        , { name = "Life & city"
+          , background = "#ffd43b"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Gym membership"
+                    , "ClassPass"
+                    , "Strava"
+                    , "Calm"
+                    , "Headspace"
+                    , "Duolingo Super"
+                    , "Wolt+"
+                    , "Uber One"
+                    , "Amazon Prime"
+                    , "Dating app premium"
+                    ]
+          }
+        ]
+    }
+
+
+foodPicker : Picker
+foodPicker =
+    { id = 3
+    , title = "What should we eat?"
+    , mechanic = Toss
+    , groups =
+        [ { name = "Starter / salad"
+          , background = "#69db7c"
+          , foreground = "#171717"
+          , pickCount = 1
+          , options =
+                choices
+                    [ "Caesar salad"
+                    , "Greek salad"
+                    , "Fattoush"
+                    , "Tabbouleh"
+                    , "Caprese"
+                    , "Cucumber salad"
+                    , "Crunchy slaw"
+                    , "Seasonal green salad"
+                    , "Tomato salad"
+                    , "Seaweed salad"
+                    , "Som tam"
+                    , "Beetroot & goat cheese"
+                    ]
+          }
+        , { name = "Main"
+          , background = "#ffd43b"
+          , foreground = "#171717"
+          , pickCount = 1
+          , options =
+                choices
+                    [ "Ramen"
+                    , "Pho"
+                    , "Tacos"
+                    , "Neapolitan pizza"
+                    , "Fresh pasta"
+                    , "Sushi"
+                    , "Bibimbap"
+                    , "Korean fried chicken"
+                    , "Butter chicken"
+                    , "Biryani"
+                    , "Falafel plate"
+                    , "Shawarma"
+                    , "Döner kebab"
+                    , "Lebanese mezze"
+                    , "Smash burger"
+                    , "Xiao long bao"
+                    , "Sichuan hotpot"
+                    , "Pad thai"
+                    , "Pad kra pao"
+                    , "Banh mi"
+                    , "Ethiopian injera platter"
+                    , "Khachapuri"
+                    , "Turkish pide"
+                    , "Spanish tapas"
+                    ]
+          }
+        , { name = "Drink"
+          , background = "#ff6b35"
+          , foreground = "#171717"
+          , pickCount = 1
+          , options =
+                choices
+                    [ "Sparkling water"
+                    , "Still water"
+                    , "Cola"
+                    , "Lemonade"
+                    , "Iced tea"
+                    , "Ginger beer"
+                    , "Ayran"
+                    , "Mango lassi"
+                    , "Kombucha"
+                    , "Local beer"
+                    , "House wine"
+                    , "Alcohol-free spritz"
+                    ]
+          }
+        ]
+    }
+
+
+vacationPicker : Picker
+vacationPicker =
+    { id = 4
+    , title = "Where should we go on vacation?"
+    , mechanic = Toss
+    , groups =
+        [ { name = "City hits"
+          , background = "#74c0fc"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Tokyo"
+                    , "Seoul"
+                    , "Taipei"
+                    , "Singapore"
+                    , "Istanbul"
+                    , "Lisbon"
+                    , "Barcelona"
+                    , "Rome"
+                    , "Copenhagen"
+                    , "Paris"
+                    , "Mexico City"
+                    , "Buenos Aires"
+                    ]
+          }
+        , { name = "Sea & islands"
+          , background = "#69db7c"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Bali"
+                    , "Zanzibar"
+                    , "Madeira"
+                    , "The Azores"
+                    , "Greek islands"
+                    , "Croatian coast"
+                    , "Amalfi Coast"
+                    , "Mallorca"
+                    , "Sicily"
+                    , "Okinawa"
+                    , "Thai islands"
+                    , "The Caribbean"
+                    ]
+          }
+        , { name = "Big nature"
+          , background = "#ffd43b"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Swiss Alps"
+                    , "The Dolomites"
+                    , "Norwegian fjords"
+                    , "Patagonia"
+                    , "Canadian Rockies"
+                    , "Costa Rica"
+                    , "Iceland Ring Road"
+                    , "New Zealand South Island"
+                    , "Namibia"
+                    , "Scottish Highlands"
+                    , "Peru"
+                    , "Jordan"
+                    ]
+          }
+        , { name = "Wildcards"
+          , background = "#ff6b35"
+          , foreground = "#171717"
+          , pickCount = 2
+          , options =
+                choices
+                    [ "Kyoto"
+                    , "Cape Town"
+                    , "Rio de Janeiro"
+                    , "Marrakech"
+                    , "Oman"
+                    , "Sri Lanka"
+                    , "Hanoi"
+                    , "Bangkok"
+                    , "Hong Kong"
+                    , "Sydney"
+                    , "New York"
+                    , "Route 66"
+                    ]
+          }
+        ]
+    }
+
+
+choices : List String -> List Choice
+choices labels =
+    List.map (\label_ -> { label = label_ }) labels
 
 
 blankPicker : Int -> Picker
@@ -1298,13 +1600,14 @@ blankPicker id_ =
 
 flagsDecoder : Decoder Flags
 flagsDecoder =
-    Decode.map6 Flags
+    Decode.map7 Flags
         (Decode.field "saved" (Decode.list pickerDecoder))
         (Decode.field "shared" (Decode.nullable pickerDecoder))
         (Decode.field "seed" (Decode.nullable Decode.int))
         (Decode.field "sharedError" (Decode.nullable Decode.string))
         (Decode.field "year" Decode.int)
         (Decode.field "editing" Decode.bool)
+        (Decode.field "defaultPickerIndex" Decode.int)
 
 
 pickerDecoder : Decoder Picker

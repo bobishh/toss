@@ -33,7 +33,11 @@ if (!optimized.code) throw new Error('Elm minification produced no output');
 
 const template = readFileSync(join(root, 'src', 'index.template.html'), 'utf8');
 const bundledJavaScript = optimized.code.replace(/<\/script/gi, '<\\/script');
-const html = template.replace('/*__ELM_BUNDLE__*/', () => bundledJavaScript);
+const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('Invalid build commit');
+const html = template.replace('/*__ELM_BUNDLE__*/', () => bundledJavaScript)
+  .replaceAll('__TOSS_BUILD_COMMIT__', commit)
+  .replaceAll('__TOSS_BUILD_SHORT__', commit.slice(0, 7));
 
 const output = join(distributionDirectory, 'index.html');
 writeFileSync(output, html);

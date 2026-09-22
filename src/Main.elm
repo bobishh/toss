@@ -525,7 +525,9 @@ view model =
                 , path [ SvgAttr.d "M32 39 L25 84 M32 39 L39 84 M21 84 H43" ] []
                 ]
             , span [ class "footer-copy" ]
-                [ text ("Berlin · " ++ String.fromInt model.year) ]
+                [ text ("Berlin · " ++ String.fromInt model.year ++ " · ")
+                , a [ href "https://github.com/bobishh/toss/commit/__TOSS_BUILD_COMMIT__", attribute "target" "_blank", attribute "rel" "noreferrer" ] [ text "__TOSS_BUILD_SHORT__" ]
+                ]
             ]
         ]
 

@@ -42,3 +42,17 @@ npm run build
 docker build -t toss .
 docker run --rm -p 8080:80 toss
 ```
+
+## Production deployment
+
+From the sibling deployment repository:
+
+```sh
+cd ../hetzner_playground
+bin/kamal toss deploy
+```
+
+The wrapper runs `npm run build` in Toss before deploying. This compiles Elm with
+`elm make --optimize`, minifies it, and rebuilds `dist/index.html` from the HTML
+template. Running `elm make` alone does not update the deployable HTML. If you
+bypass the wrapper and use Kamal or Docker directly, run `npm run build` first.

@@ -36,6 +36,7 @@ const bundledJavaScript = optimized.code.replace(/<\/script/gi, '<\\/script');
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('Invalid build commit');
 const html = template.replace('/*__ELM_BUNDLE__*/', () => bundledJavaScript)
+  .replace('/*__BERLIN_TOWER__*/', () => readFileSync(join(root, 'src/vendor/berlin-tower.js'), 'utf8'))
   .replaceAll('__TOSS_BUILD_COMMIT__', commit)
   .replaceAll('__TOSS_BUILD_SHORT__', commit.slice(0, 7));
 

@@ -9,8 +9,6 @@ import Json.Encode as Encode
 import List
 import Process
 import String
-import Svg exposing (circle, line, path, svg)
-import Svg.Attributes as SvgAttr
 import Task
 
 
@@ -515,16 +513,7 @@ view model =
             RunScreen ->
                 viewRunner model
         , footer [ class "site-footer" ]
-            [ Html.node "berlin-tower" [ class "tower-mark" ] [ svg
-                [ SvgAttr.width "100%", SvgAttr.height "100%"
-                , SvgAttr.viewBox "0 0 64 96"
-                , attribute "aria-hidden" "true"
-                ]
-                [ line [ SvgAttr.x1 "32", SvgAttr.y1 "3", SvgAttr.x2 "32", SvgAttr.y2 "39" ] []
-                , circle [ SvgAttr.class "tower-mark__sphere", SvgAttr.cx "32", SvgAttr.cy "29", SvgAttr.r "10" ] []
-                , path [ SvgAttr.d "M32 39 L25 84 M32 39 L39 84 M21 84 H43" ] []
-                ]
-            ]
+            [ Html.node "berlin-tower" [ class "tower-mark" ] []
             , span [ class "footer-copy" ]
                 [ text ("Berlin · " ++ String.fromInt model.year ++ " · ")
                 , a [ href "https://github.com/bobishh/toss/commit/__TOSS_BUILD_COMMIT__", attribute "target" "_blank", attribute "rel" "noreferrer" ] [ text "__TOSS_BUILD_SHORT__" ]

@@ -90,7 +90,7 @@ test('Given three technology lists, When Technology toss runs, Then one technolo
     await expect(page.getByPlaceholder('Image URL (optional)')).toHaveCount(0);
     await expect(page.getByTestId('share-length')).toHaveText(/^\d+ \/ 2,000 characters$/);
     await expect(page.getByText('ELM 0.19.2')).toHaveCount(0);
-    await expect(page.locator('.site-footer')).toHaveText(/tossed together @ berlin \d{4}/);
+    await expect(page.locator('.site-footer')).toHaveText(/Berlin · \d{4} · [0-9a-f]{7}/);
     await expect(page.locator('.tower-mark')).toBeVisible();
   });
 

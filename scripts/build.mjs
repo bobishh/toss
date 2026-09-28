@@ -32,11 +32,17 @@ const optimized = await minify(compiled, {
 if (!optimized.code) throw new Error('Elm minification produced no output');
 
 const template = readFileSync(join(root, 'src', 'index.template.html'), 'utf8');
+const font = readFileSync(join(root, 'src', 'vendor', 'inter-latin-wght-normal.woff2')).toString('base64');
+const foundation = readFileSync(join(root, 'src', 'vendor', 'site-foundation.css'), 'utf8')
+  .replace('/assets/inter-latin-wght-normal.woff2', `data:font/woff2;base64,${font}`);
 const bundledJavaScript = optimized.code.replace(/<\/script/gi, '<\\/script');
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('Invalid build commit');
-const html = template.replace('/*__ELM_BUNDLE__*/', () => bundledJavaScript)
+const html = template.replace('/*__SITE_FOUNDATION__*/', () => foundation)
+  .replace('/*__ELM_BUNDLE__*/', () => bundledJavaScript)
   .replace('/*__BERLIN_TOWER__*/', () => readFileSync(join(root, 'src/vendor/berlin-tower.js'), 'utf8'))
+  .replace('__FAVICON_PNG__', readFileSync(join(root, 'src/vendor/favicon.png')).toString('base64'))
+  .replace('__APPLE_TOUCH_ICON__', readFileSync(join(root, 'src/vendor/apple-touch-icon.png')).toString('base64'))
   .replaceAll('__TOSS_BUILD_COMMIT__', commit)
   .replaceAll('__TOSS_BUILD_SHORT__', commit.slice(0, 7));
 
